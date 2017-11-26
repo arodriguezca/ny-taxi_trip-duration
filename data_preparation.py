@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
+from math import radians
 
 # DATA PRE-PROCESSING
 
@@ -79,28 +80,46 @@ train_df = train_df[(train_df.dropoff_latitude> ylim[0]) & (train_df.dropoff_lat
     Cluster by pickup location
 """
 # re-calculate long and lat with cleaned data
-longitude = list(train_df.pickup_longitude) + list(df.dropoff_longitude)
-latitude = list(df.pickup_latitude) + list(df.dropoff_latitude)
+longitude = list(train_df.pickup_longitude) + list(train_df.dropoff_longitude)
+latitude = list(train_df.pickup_latitude) + list(train_df.dropoff_latitude)
 # now we cluster the
-k_means = KMeans(n_clusters=5)
-k_means.fit(pd.DataFrame(latitude,longitude))
-# create new column with the cluster of each location
-train_df['location_cluster'] = k_means.labels_
+k_means = KMeans(n_clusters=6)
+k_means.fit(pd.DataFrame({'lat':latitude,'lon':longitude}))
+# see means in map
+plt.figure()
+plt.plot(longitude,latitude,'.', alpha = 0.6, markersize = 0.09)
+plt.plot(k_means.cluster_centers_[:,1], k_means.cluster_centers_[:,0],'.', markersize = 15)
+plt.show()
+# create two new columns with the cluster of each location
+train_df['pickup_cluster'] = k_means.labels_[0:train_df.__len__()]
+train_df['dropoff_cluster'] = k_means.labels_[train_df.__len__():]
+
+"""
+    Manhattan distance
+"""
 
 
-
-from math import radians, cos, sin, asin, sqrt
-
-#manhattan distance in kilometers
+# manhattan distance in kilometers
 def distance_manhattan(lon1, lat1, lon2, lat2):
-     # convert decimal degrees to radians
+    # convert decimal degrees to radians
     lon1, lat1, lon2, lat2 = map(radians, [lon1, lat1, lon2, lat2])
     md = abs(lon1 - lon2) + abs(lat1 - lat2)
     return md * 6373
 
-train_df['man_distance'] = train_df.apply(lambda r: distance_manhattan(r['pickup_latitude'], r['pickup_longitude'], r['dropoff_latitude'], r['dropoff_longitude']), axis=1)]
+train_df['manhattan_distance'] = train_df.apply(lambda r:
+                                                distance_manhattan(r['pickup_latitude'], r['pickup_longitude'], r['dropoff_latitude'], r['dropoff_longitude']), axis=1)
 
+"""
+    Delete unused columns in train and test
+"""
 
+# now, get rid of unnecesary columns
+drop_columns = ['id', 'dropoff_datetime', 'dropoff_latitude', 'dropoff_longitude',
+                'pickup_datetime', 'pickup_latitude', 'pickup_longitude', 'year']
+train_df.drop(drop_columns, 1, inplace=True)
+test_df.drop(drop_columns, 1, inplace=True)
+# see columns left
+list(train_df)
 
 
 
