@@ -89,6 +89,8 @@ k_means.fit(pd.DataFrame({'lat':latitude,'lon':longitude}))
 plt.figure()
 plt.plot(longitude,latitude,'.', alpha = 0.6, markersize = 0.09)
 plt.plot(k_means.cluster_centers_[:,1], k_means.cluster_centers_[:,0],'.', markersize = 15)
+plt.xlabel('Longitude')
+plt.ylabel('Latitude')
 plt.show()
 # create two new columns with the cluster of each location
 train_df['pickup_cluster'] = k_means.labels_[0:train_df.__len__()]
@@ -114,16 +116,31 @@ train_df['manhattan_distance'] = train_df.apply(lambda r:
 """
 
 # now, get rid of unnecesary columns
-drop_columns = ['id', 'dropoff_datetime', 'dropoff_latitude', 'dropoff_longitude',
+drop_columns = ['id', 'dropoff_datetime', 'dropoff_latitude', 'dropoff_longitude', 'date', 'day', 'hour',
                 'pickup_datetime', 'pickup_latitude', 'pickup_longitude', 'year']
 train_df.drop(drop_columns, 1, inplace=True)
 test_df.drop(drop_columns, 1, inplace=True)
 # see columns left
 list(train_df)
 
+"""
+    Convert to categorical some that are numerical
+"""
+
+train_df["month"] = train_df["month"].astype('category')
+train_df["weekday"] = train_df["weekday"].astype('category')
+train_df["pickup_cluster"] = train_df["pickup_cluster"].astype('category')
+train_df["dropoff_cluster"] = train_df["dropoff_cluster"].astype('category')
+train_df['snow'] = train_df["snow"].astype('category')
+
+train_df.to_pickle('data_train_preprocessed.pkl')
 
 
-
+# df = train_df
+# cat_columns = train_df.select_dtypes(['object']).columns
+# train_df[cat_columns] = train_df[cat_columns].apply(lambda x: x.astype('category').cat.codes)
+#
+# train_df = df
 
 
 import numpy as np
