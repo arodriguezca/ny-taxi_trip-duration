@@ -132,6 +132,7 @@ train_df["weekday"] = train_df["weekday"].astype('category')
 train_df["pickup_cluster"] = train_df["pickup_cluster"].astype('category')
 train_df["dropoff_cluster"] = train_df["dropoff_cluster"].astype('category')
 train_df['snow'] = train_df["snow"].astype('category')
+train_df['vendor_id'] = train_df["vendor_id"].astype('category')
 
 train_df.to_pickle('data_train_preprocessed.pkl')
 
