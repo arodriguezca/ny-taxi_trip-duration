@@ -21,21 +21,13 @@ class DecisionNode:
 """
         max_depth: Maximum number of splits during training
         min_leaf_samples:  Minimum number of examples in a leaf node.
-        max_features:  Maximum number of features considered at each split 
 """
 class DecisionTreeRegressor():
 
-    def __init__(self, max_depth=-1, min_leaf_samples=6, max_features="auto"):
+    def __init__(self, max_depth=-1, min_leaf_samples=6):
         self.root_node = None
         self.max_depth = max_depth
         self.min_leaf_samples = min_leaf_samples
-
-        if max_features in ["auto", "sqrt", "log2"] or isinstance(max_features,
-                                                                  int) or max_features is None:
-            self.max_features = max_features
-            self.selected_features = None
-        else:
-            raise ValueError("Argument max_features must be 'auto', 'sqrt', 'log2', an int or None")
 
     """
         Trains the algorithm using the given dataset. feature_space:    Features used to train the tree.
@@ -45,7 +37,7 @@ class DecisionTreeRegressor():
         # print("Sasas")
         if len(feature_space) < 1:
             raise ValueError("Not enough samples in the given dataset")
-        self.getMaxFeaturesAtSplit(feature_space[0])
+
         feature_datatypes = ["category" if len(set(feature_space[:, i])) <= 12 else "number" for i in
                              range(len(feature_space[0]))]
         self.root_node = self.growTree(feature_space, targets, self.max_depth, feature_datatypes = feature_datatypes)
@@ -60,29 +52,6 @@ class DecisionTreeRegressor():
         return res  # self.propagate(features, self.root_node)
 
     """
-            Sets the number of considered features at each split depending on the
-            max_features parameter.row: A single row of the features of shape (n_features)
-    """
-    def getMaxFeaturesAtSplit(self, row):
-        if isinstance(self.max_features, int):
-            self.selected_features = self.max_features if \
-                self.max_features <= len(row) else len(row)
-        elif isinstance(self.max_features, str):
-            if self.max_features in ['auto', 'sqrt']:
-                self.selected_features = int(sqrt(len(row)))
-            elif self.max_features == 'log2':
-                self.selected_features = int(log2(len(row)))
-        else:
-            self.selected_features = len(row)
-
-    """
-        Returns the randomly selected values in the given features.
-        row: One-dimensional array of features
-    """
-    def get_features_subset(self, row):
-        return [row[i] for i in self.features_indexes]
-
-    """
             Calculate the variance in the given list.
     """
     def variance(self, targets):
@@ -92,6 +61,18 @@ class DecisionTreeRegressor():
         mean = np.average(targets)
         variance = sum([(x - mean) ** 2 for x in targets])
         return variance
+
+    '''
+        calculate the mean absolute error in the given list
+    '''
+    def mae(self, targets):
+        if len(targets) == 0:
+            return None
+
+        mean = np.average(targets)
+        mae = np.sum([np.abs(x - mean) for x in targets])
+        return mae
+
 
     """
             Divide the given dataset depending on the value at the given column index.
@@ -121,10 +102,11 @@ class DecisionTreeRegressor():
             # result.append(tree.result)
             return tree.result
         else:
-            print("else block of propogation")
+            #print("else block of propogation")
             v = observation[tree.col]
             branch = None
             if isinstance(v, Number):
+                #print(v, tree.value)
                 if v >= tree.value:
                     branch = tree.left_branch
                 else:
@@ -143,6 +125,15 @@ class DecisionTreeRegressor():
             is no real reduce in variance, or there is less examples in a node than
             the minimum number of examples, or until the max depth is reached.
     """
+    def getSorted(self, features, column, targets):
+        features_sorted = []
+        targets_sorted = []
+        sorted_features_targets = sorted(zip(features, targets), key=lambda feature: feature[0][column])
+        for pair in sorted_features_targets:
+            features_sorted.append(pair[0])
+            targets_sorted.append(pair[1])
+        return features_sorted, targets_sorted
+
     def growTree(self, features, targets, depth, feature_datatypes):
         if len(features) == 0:
             return DecisionNode()
@@ -154,25 +145,51 @@ class DecisionTreeRegressor():
         best_sets = None
         #get feature data types
         #print(features.shape)
-
-        print(feature_datatypes)
-
-
+        #print(feature_datatypes)
         #print(features_selected)  # to be removed
         for column in range(len(feature_datatypes)):
             feature_values = [feature[column] for feature in features]
             if feature_datatypes[column] == "number":
-                for feature_value in feature_values:
-                    feats1, targs1, feats2, targs2 = self.splitNumericCat(features, targets, column, feature_value, feature_datatypes)
-                    var1 = self.variance(targs1)
-                    var2 = self.variance(targs2)
-                    if var1 is None or var2 is None:
-                        continue
-                    variance = var1 + var2
-                    if (lowest_variance is None) or np.all(variance < lowest_variance):
-                        lowest_variance = variance
-                        best_split_criteria = (column, feature_value)
-                        best_sets = ((feats1, targs1), (feats2, targs2))
+                features_sorted, targets_sorted  = self.getSorted(features, column, targets)
+                feature_values_sorted = [feature[column] for feature in features_sorted]
+                #print(feature_values_sorted)
+                if len(set(feature_values_sorted)) <= 200:
+                    for set_value in  list(set(feature_values_sorted)):
+                        feature_value = set_value
+                        index = feature_values_sorted.index(set_value)
+                        feats1 = features_sorted[index:]
+                        targs1 = targets_sorted[index:]
+                        feats2 = features_sorted[0:index - 1]
+                        targs2 = targets_sorted[0:index - 1]
+                        var1 = self.variance(targs1)
+                        var2 = self.variance(targs2)
+                        #print("coninuous cat")
+                        if var1 is None or var2 is None:
+                            continue
+                        variance = var1 + var2
+                        if (lowest_variance is None) or np.all(variance < lowest_variance):
+                            lowest_variance = variance
+                            best_split_criteria = (column, feature_value)
+                            # print(best_split_criteria)
+                            best_sets = ((feats1, targs1), (feats2, targs2))
+
+                else:
+                    for index, feature_value  in enumerate(feature_values_sorted):
+                            #feats1, targs1, feats2, targs2 = self.splitNumericCat(features, targets, column, feature_value, feature_datatypes, index)
+                        feats1 = features_sorted[index:]
+                        targs1 = targets_sorted[index:]
+                        feats2 = features_sorted[0:index-1]
+                        targs2 = targets_sorted[0:index-1]
+                        var1 = self.variance(targs1)
+                        var2 = self.variance(targs2)
+                        if var1 is None or var2 is None:
+                            continue
+                        variance = var1 + var2
+                        if (lowest_variance is None) or np.all(variance < lowest_variance):
+                            lowest_variance = variance
+                            best_split_criteria = (column, feature_value)
+                                #print(best_split_criteria)
+                            best_sets = ((feats1, targs1), (feats2, targs2))
             else:
                 for feature_value in set(feature_values):
                     feats1, targs1, feats2, targs2 = self.splitNumericCat(features, targets, column, feature_value, feature_datatypes)
@@ -211,23 +228,17 @@ if __name__ == "__main__":
     train_y = np.log1p(train_df.trip_duration)
     num_arr = train_x.values
     num_arr_y = train_y
-    num_arr_y = np.array(num_arr_y[:5000])
-    dt = DecisionTreeRegressor(max_depth=5)
-    print("decision tree starerted")
-    dt.fit(num_arr[0:5000, :], num_arr_y.reshape(len(num_arr_y), 1))
-    x = dt.predict(num_arr[5001:5100])
-    print(x)
-    rmlse = np.sqrt(np.average(np.square(np.subtract(np.array(train_y[5001:5100]), np.array(x).T))))
-    print(rmlse)
-    # rmlse = dt.getlrmse(np.array(train_y[1001:1050]), np.array(x).T)
-    y = train_y.values
-    print(train_y[10001])
-    # if True:
-    #     #newfile = sys.argv[1]
-    #     # load the data file and do the preprocessing
-    #     num_arr = pd.read_csv("JohnsonJohnson.csv")
-    # num_arr = num_arr.values
-    # dt = DecisionTreeRegressor(max_depth=4)
-    # dt.fit(num_arr[:,:-1], num_arr[:,-1].reshape(len(num_arr),1))
-    # x = dt.predict(num_arr[:,:-1])
-    # print(x)
+    num_arr_y = np.array(num_arr_y[:100000])
+    max_depths = [6]
+    min_sample_leaves = [5]
+    for md in max_depths:
+        for msl in min_sample_leaves:
+            print("maximum depth is {} and min leaf samples i s{}".format(md, msl))
+            dt = DecisionTreeRegressor(max_depth=md, min_leaf_samples=msl)
+            print("decision tree starerted")
+            dt.fit(num_arr[0:100000, :], num_arr_y.reshape(len(num_arr_y), 1))
+            x = dt.predict(num_arr[100001:105000])
+            print(x)
+            rmlse = np.sqrt(np.average(np.square(np.subtract(np.array(train_y[100001:105000]), np.array(x).T))))
+            print(rmlse)
+
