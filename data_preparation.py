@@ -196,23 +196,3 @@ train_df['hour'] = train_df.pickup_datetime.dt.hour
 train_df['store_and_fwd_flag'] = train_df['store_and_fwd_flag'].map(lambda x: 0 if x == 'N' else 1)
 train_df = train_df.drop(['id', 'pickup_datetime', 'dropoff_datetime', 'trip_duration'], axis=1)
 
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.neighbors import KNeighborsRegressor
-from sklearn.tree import DecisionTreeRegressor
-from xgboost.sklearn import XGBRegressor
-
-xgb_model = XGBRegressor(objective='reg:linear', n_estimators=500, subsample=0.75, max_depth=5)
-rf_model = RandomForestRegressor(n_estimators=25, min_samples_leaf=25, min_samples_split=25)
-tree_model = DecisionTreeRegressor(min_samples_leaf=25, min_samples_split=25)
-
-from sklearn.model_selection import cross_val_score
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error
-from sklearn.grid_search import GridSearchCV, RandomizedSearchCV
-
-train_x, Test_X,Train_y, test_y =  train_test_split(train_df, train_y, test_size = 0.2)
-
-param_grid = {"learning_rate": np.random.uniform(0.001, 0.1, 5),'max_depth': np.arange(2,8)}
-
-tree_model.fit(train_x, Train_y)
-

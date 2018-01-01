@@ -6,3 +6,6 @@ sample_submission.csv
 Weather.csv
 /.idea
 data_train_preprocessed.pkl
+/ElasticNets
+*.npy
+*.pdf

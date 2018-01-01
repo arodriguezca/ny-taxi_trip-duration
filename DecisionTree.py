@@ -4,6 +4,7 @@ from math import log2, sqrt
 from numbers import Number
 import pickle
 import pandas as pd
+import matplotlib.pyplot as plt
 
 """
     Represents a node / leaf in a tree.
@@ -222,23 +223,70 @@ class DecisionTreeRegressor():
 
 
 if __name__ == "__main__":
-    train_df = pd.read_pickle('train.pkl')
-    train_x = train_df.drop('trip_duration', 1)
-    # train_y = train_df['trip_duration']
-    train_y = np.log1p(train_df.trip_duration)
-    num_arr = train_x.values
-    num_arr_y = train_y
-    num_arr_y = np.array(num_arr_y[:100000])
-    max_depths = [6]
-    min_sample_leaves = [5]
-    for md in max_depths:
-        for msl in min_sample_leaves:
-            print("maximum depth is {} and min leaf samples i s{}".format(md, msl))
-            dt = DecisionTreeRegressor(max_depth=md, min_leaf_samples=msl)
-            print("decision tree starerted")
-            dt.fit(num_arr[0:100000, :], num_arr_y.reshape(len(num_arr_y), 1))
-            x = dt.predict(num_arr[100001:105000])
-            print(x)
-            rmlse = np.sqrt(np.average(np.square(np.subtract(np.array(train_y[100001:105000]), np.array(x).T))))
-            print(rmlse)
 
+    train_df = pd.read_pickle('data_train_preprocessed.pkl')
+
+    binary_df = pd.get_dummies(train_df)
+    # shuffle dataset and then subset it (30% for test)
+    binary_df.sample(frac=1, random_state=5)  # shuffle
+    binary_df_train = binary_df.iloc[:101925, :]
+    binary_df_test = binary_df.iloc[101925:, :]
+    X_train = np.array(binary_df_train.drop(columns='trip_duration'))
+    y_train = np.log1p(np.array(binary_df_train['trip_duration']))
+    X_test = np.array(binary_df_test.drop(columns='trip_duration'))
+    y_test = np.log1p(np.array(binary_df_test['trip_duration']))
+
+    # hyper-parameters for DT
+    MAX_DEPTHS = [2, 4, 6]
+    MIN_SAMPLES_IN_LEAF = [5, 10, 15]
+    K = 5  # number of iterations
+
+    # init matrix to save average the mse
+    mse = np.empty([3, 3, K])
+
+    for i in range(K):
+        # shuffle rows
+        np.random.seed(i + 1)
+        shuffle_indexes = np.random.permutation(len(y_train))
+        X_train = X_train[shuffle_indexes, :]
+        y_train = y_train[shuffle_indexes]
+        # split train in two: train and validation (30% for validation)
+        # the dataset is already shuffled
+        X_train_2 = X_train[:71347, :]
+        y_train_2 = y_train[:71347]
+        X_validation = X_train[71347:, :]
+        y_validation = y_train[71347:]
+        row = 0
+        for md in MAX_DEPTHS:
+            col = 0
+            for msl in MIN_SAMPLES_IN_LEAF:
+                print("maximum depth is {} and min leaf samples i {}".format(md, msl))
+                dt = DecisionTreeRegressor(max_depth=md, min_leaf_samples=msl)
+                dt.fit(X_train_2, y_train_2)
+                y_pred = dt.predict(X_validation)
+                squared_errors = np.power(y_pred - y_validation, 2)
+                e_v = pow(sum(squared_errors) / len(squared_errors), 0.5)
+                mse[row, col, i] = e_v
+                col += 1
+            row += 1
+
+        # the mean of mse
+        mse = np.load("mse_dt.npy")
+        avg_mse = np.mean(mse, axis=2)
+
+        X, Y = np.meshgrid(MIN_SAMPLES_IN_LEAF, MAX_DEPTHS)
+        # contour plot
+        plt.pcolor(X, Y, avg_mse)
+        plt.xlabel("Min samples in leaf")
+        plt.ylabel("Maximum depth")
+        plt.xticks(MIN_SAMPLES_IN_LEAF)
+        plt.yticks(MAX_DEPTHS)
+        plt.colorbar()
+        plt.title('Average RMSLE for DT with MAE split criteria')
+
+        # predict in test data with tuned parameters
+        dt = DecisionTreeRegressor(max_depth=4, min_leaf_samples=5)
+        dt.fit(X_train, y_train)
+        y_pred = dt.predict(X_test)
+        squared_errors = np.power(y_pred - y_test, 2)
+        e_v = pow(sum(squared_errors) / len(squared_errors), 0.5)
