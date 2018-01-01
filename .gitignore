@@ -9,4 +9,4 @@ Weather.csv
 data_train_preprocessed.pkl
 /ElasticNets
 *.npy
-*.pdf
+*.zip
